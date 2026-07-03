@@ -29,11 +29,7 @@ groups:
         tracking_branch: main
         owner: michael
         role: Legacy SQL reads behind librarian
-      - name: palantir
-        tracking_branch: master
-        owner: cameron
-        sync_policy: pull_only
-        role: Operator fetch pattern
+      # palantir retired 2026-07-03 — Cameron folded operator fetch into nostradamus
 
   matador-meta:
     description: Operation Matador coordination and meta tooling (Michael pushes master)
