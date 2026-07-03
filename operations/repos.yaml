@@ -1,0 +1,87 @@
+# Canonical modern-platform repo registry (Gringotts source of truth).
+# Excludes old_cloudtrade_repos — legacy uses feature branches only; never auto-push.
+#
+# sync_policy:
+#   push_master  — Michael/meta repos: gringotts sync push may push to tracking branch
+#   pull_only    — team repos: fetch + pull only; never push via gringotts
+
+workspace: C:/Users/MichaelThomson/source/cc_repos
+
+groups:
+  matador-runtime:
+    description: Matador container profile (portkey --profile matador)
+    repos:
+      - name: Sauron
+        tracking_branch: master
+        owner: michael
+        role: Orchestration; sauron proctor / sauron phineas
+      - name: librarian
+        tracking_branch: master
+        owner: cameron
+        sync_policy: pull_only
+        role: Storage gate; get-document-files
+      - name: nostradamus
+        tracking_branch: master
+        owner: josh
+        sync_policy: pull_only
+        role: Dual-LLM extraction
+      - name: ridcully
+        tracking_branch: main
+        owner: michael
+        role: Legacy SQL reads behind librarian
+      - name: palantir
+        tracking_branch: master
+        owner: cameron
+        sync_policy: pull_only
+        role: Operator fetch pattern
+
+  matador-meta:
+    description: Operation Matador coordination and meta tooling (Michael pushes master)
+    repos:
+      - name: matador
+        tracking_branch: master
+        owner: michael
+        role: Checklists, trigger poll
+      - name: portkey
+        tracking_branch: master
+        owner: michael
+        role: Azure deploy wizard
+      - name: proctor
+        tracking_branch: master
+        owner: michael
+        role: Test gates (via Sauron)
+      - name: phineas
+        tracking_branch: master
+        owner: michael
+        role: Diagrams (via Sauron)
+      - name: gringotts
+        tracking_branch: master
+        owner: michael
+        role: Repo registry and sync (this wizard)
+      - name: hermione
+        tracking_branch: master
+        owner: michael
+        role: Documentation hub
+
+scopes:
+  matador:
+    description: Everything needed for Operation Matador day-to-day
+    groups:
+      - matador-runtime
+      - matador-meta
+
+  matador-pull:
+    description: Safe pull — all Matador repos including team-owned
+    groups:
+      - matador-runtime
+      - matador-meta
+
+  michael-push:
+    description: Repos Michael may push to master via gringotts sync push
+    groups:
+      - matador-meta
+    repos:
+      - name: Sauron
+        tracking_branch: master
+      - name: ridcully
+        tracking_branch: main
