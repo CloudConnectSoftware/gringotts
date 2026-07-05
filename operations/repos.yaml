@@ -5,7 +5,8 @@
 #   push_master  — Michael/meta repos: gringotts sync push may push to tracking branch
 #   pull_only    — team repos: fetch + pull only; never push via gringotts
 
-workspace: C:/Users/MichaelThomson/source/cc_repos
+# workspace: omitted — defaults to gringotts's parent folder (cc_repos on Michael's PC,
+# CloudConnectSoftware on Josh's), or set GRINGOTTS_WORKSPACE.
 
 groups:
   matador-runtime:
