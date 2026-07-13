@@ -5,7 +5,7 @@ config_files:
   - id: portkey-irc-client
     repo: portkey
     path: portkey.irc.client.yaml
-    template: portkey.irc.client.lupin.example.yaml
+    template: portkey.irc.client.oz.example.yaml
     gitignored: true
     scope: irc-client
     description: portkey irc peek/tail/send — host, TLS port, oper password reference
