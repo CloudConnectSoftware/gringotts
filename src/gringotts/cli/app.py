@@ -1,7 +1,9 @@
 """
-gringotts.cli.app — Repo vault wizard for the modern platform.
+gringotts.cli.app — Platform vault wizard for the modern platform.
 
-Canonical registry in operations/repos.yaml. No old_cloudtrade_repos.
+IP vault: operations/repos.yaml (source repos).
+Key vault: operations/secrets-registry.yaml + config-manifest.yaml + vault/ (gitignored).
+No old_cloudtrade_repos.
 """
 
 from __future__ import annotations
@@ -19,22 +21,33 @@ from rich.table import Table
 from gringotts import __version__
 from gringotts import git_ops
 from gringotts.registry import load_registry
-from gringotts.workspace import REGISTRY_PATH, hermione_root
+from gringotts.vault_registry import (
+    default_vault_dir,
+    load_config_manifest,
+    load_secrets_registry,
+    secret_status,
+    vault_file_for_scope,
+)
+from gringotts.workspace import REGISTRY_PATH, default_workspace, hermione_root
 
 console = Console()
 
 app = typer.Typer(
     name="gringotts",
-    help="Gringotts — repo registry and sync for the modern platform (not legacy).",
+    help="Gringotts — IP vault (repos) + Key vault (secrets/config) for the modern platform.",
     add_completion=True,
     no_args_is_help=True,
 )
 
 repos_app = typer.Typer(help="Inspect the canonical repo registry")
 sync_app = typer.Typer(help="Fetch, pull, and push registered repos")
+keys_app = typer.Typer(help="Key vault — secret registry and local vault status")
+config_app = typer.Typer(help="Config manifest — local config files and templates")
 hermione_app = typer.Typer(help="Hermione documentation helpers")
 app.add_typer(repos_app, name="repos")
 app.add_typer(sync_app, name="sync")
+app.add_typer(keys_app, name="keys")
+app.add_typer(config_app, name="config")
 app.add_typer(hermione_app, name="hermione")
 
 
@@ -182,6 +195,138 @@ def sync_fetch(
     registry, repos = _load(scope, registry_file)
     rows = [git_ops.fetch_repo(registry, entry) for entry in repos]
     console.print(_status_table(rows, f"Gringotts Fetch — scope '{scope}'"))
+
+
+@keys_app.command("scopes")
+def keys_scopes():
+    """List secret scopes in the Key Vault registry."""
+    registry = load_secrets_registry()
+    for name, spec in registry.scopes.items():
+        console.print(f"  [cyan]{name}[/] — {spec.description}")
+
+
+@keys_app.command("plan")
+def keys_plan(
+    scope: str = typer.Option("matador-aci", "--scope", "-s"),
+):
+    """Show Key Vault registry path, local vault dir, and secrets for a scope."""
+    registry = load_secrets_registry()
+    if scope not in registry.scopes:
+        known = ", ".join(sorted(registry.scopes))
+        console.print(f"[red]Unknown scope '{scope}'. Choose: {known}[/red]")
+        raise typer.Exit(1)
+    spec = registry.scopes[scope]
+    vault_dir = default_vault_dir()
+    vault_path = vault_file_for_scope(registry, scope, vault_dir)
+    console.print(Panel.fit(
+        f"Registry: [cyan]{registry.source_path}[/]\n"
+        f"Vault dir: [cyan]{vault_dir}[/]\n"
+        f"Scope: [cyan]{scope}[/] — {len(spec.secrets)} secret(s)\n"
+        f"Vault file: [cyan]{vault_path}[/]\n"
+        f"Doc: [dim]{spec.doc}[/]",
+        title="Gringotts Key Vault",
+        border_style="yellow",
+    ))
+
+
+@keys_app.command("list")
+def keys_list(
+    scope: str = typer.Option("matador-aci", "--scope", "-s"),
+):
+    """List secrets registered for a scope (names only — never values)."""
+    registry = load_secrets_registry()
+    if scope not in registry.scopes:
+        known = ", ".join(sorted(registry.scopes))
+        console.print(f"[red]Unknown scope '{scope}'. Choose: {known}[/red]")
+        raise typer.Exit(1)
+    table = Table(title=f"Secrets — scope '{scope}'", show_header=True)
+    table.add_column("Name", style="cyan")
+    table.add_column("Wizard")
+    table.add_column("Required")
+    table.add_column("Notes", style="dim")
+    for entry in registry.scopes[scope].secrets:
+        req = str(entry.required)
+        table.add_row(entry.name, entry.wizard, req, entry.notes[:60])
+    console.print(table)
+
+
+@keys_app.command("status")
+def keys_status_cmd(
+    scope: str = typer.Option("matador-aci", "--scope", "-s"),
+):
+    """Report which registered secrets are present in the local vault file."""
+    registry = load_secrets_registry()
+    if scope not in registry.scopes:
+        known = ", ".join(sorted(registry.scopes))
+        console.print(f"[red]Unknown scope '{scope}'. Choose: {known}[/red]")
+        raise typer.Exit(1)
+    vault_dir = default_vault_dir()
+    vault_path = vault_file_for_scope(registry, scope, vault_dir)
+    rows = secret_status(registry, scope, vault_dir)
+    table = Table(title=f"Key Vault Status — scope '{scope}'", show_header=True)
+    table.add_column("Secret", style="cyan")
+    table.add_column("Wizard")
+    table.add_column("Required")
+    table.add_column("Local")
+    missing_required = 0
+    for row in rows:
+        label = "[green]set[/]" if row["present"] else "[red]missing[/]"
+        req = str(row["required"])
+        if row["required"] is True and not row["present"]:
+            missing_required += 1
+        table.add_row(row["name"], row["wizard"], req, label)
+    console.print(table)
+    if not vault_path.is_file():
+        console.print(f"[yellow]Vault file not found: {vault_path}[/yellow]")
+        console.print("Create it from Hermione secrets.md — values never go in git.")
+    elif missing_required:
+        console.print(f"[yellow]{missing_required} required secret(s) missing locally.[/yellow]")
+    else:
+        console.print("[green]All required secrets present in local vault file.[/green]")
+
+
+@config_app.command("list")
+def config_list():
+    """List tracked config files (templates and gitignored local paths)."""
+    manifest = load_config_manifest()
+    workspace = default_workspace()
+    table = Table(title="Config manifest", show_header=True)
+    table.add_column("ID", style="cyan")
+    table.add_column("Repo")
+    table.add_column("Path")
+    table.add_column("Scope")
+    table.add_column("Gitignored")
+    for entry in manifest.files:
+        table.add_row(
+            entry.id,
+            entry.repo,
+            entry.path,
+            entry.scope,
+            "yes" if entry.gitignored else "no",
+        )
+    console.print(table)
+    console.print(f"Workspace: [cyan]{workspace}[/]")
+
+
+@config_app.command("status")
+def config_status():
+    """Show whether each manifest config file exists (and template if applicable)."""
+    manifest = load_config_manifest()
+    workspace = default_workspace()
+    table = Table(title="Config status", show_header=True)
+    table.add_column("ID", style="cyan")
+    table.add_column("Local")
+    table.add_column("Template")
+    for entry in manifest.files:
+        local = workspace / entry.repo / entry.path
+        local_label = "[green]yes[/]" if local.is_file() else "[red]no[/]"
+        if entry.template:
+            tmpl = workspace / entry.repo / entry.template
+            tmpl_label = "[green]yes[/]" if tmpl.is_file() else "[red]no[/]"
+        else:
+            tmpl_label = "—"
+        table.add_row(entry.id, local_label, tmpl_label)
+    console.print(table)
 
 
 @hermione_app.command("paths")

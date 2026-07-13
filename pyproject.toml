@@ -1,7 +1,7 @@
 [project]
 name = "gringotts"
-version = "0.1.0"
-description = "Gringotts — repo vault wizard: canonical registry and sync for the modern platform."
+version = "0.2.0"
+description = "Gringotts — IP vault (repos) + Key vault (secrets/config) for the modern platform."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

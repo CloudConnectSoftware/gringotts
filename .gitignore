@@ -4,3 +4,9 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 *.egg-info/
+
+# Key vault — secret values and local config (registry yaml stays in git)
+vault/*
+!vault/README.md
+*.env
+!*.env.example
