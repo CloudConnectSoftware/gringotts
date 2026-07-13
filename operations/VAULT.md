@@ -53,3 +53,17 @@ gitignored yaml, and Cameron's pain-point ACI setup. No single executable checkl
 | `gringotts/operations/secrets-registry.yaml` | Executable index + `keys status` input |
 
 Hermione prose wins for *meaning*; gringotts registry wins for *automation*.
+
+## Sauron runtime flow (design)
+
+**Only Sauron** loads the Key vault inside a running container. Processing wizards and
+dumbledore never subprocess gringotts — they read `os.environ` only.
+
+| Phase | Actor | Action |
+|-------|-------|--------|
+| Setup | Developers / AIs | `sync pull`, populate `vault/`, `keys status` |
+| Startup | Sauron | `ensure_vault(scope)` — merge registry + vault file into env |
+| Lazy | Sauron | Before `invoke_wizard_cli`, ensure spoke's secrets present |
+| Prod ACI | Azure | Secure env vars set on container; real env wins over vault file |
+
+Hermione: `hermione/docs/how-to/gringotts-vault-flow.md`
